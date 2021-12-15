@@ -1,25 +1,33 @@
 const router = require("express").Router();
-const bcrypt = require("bcryptjs")
-const { checkUsernameExists, validateRoleName, checkUsernameFree, checkPasswordLength } = require('./auth-middleware');
+const bcrypt = require("bcryptjs");
+const {
+  checkUsernameExists,
+  validateRoleName,
+  checkUsernameFree,
+  checkPasswordLength,
+} = require("./auth-middleware");
 const { JWT_SECRET, BCRYPT_ROUNDS } = require("../secrets"); // use this secret!
-const jwt = require("jsonwebtoken")
+const jwt = require("jsonwebtoken");
 const User = require("../users/users-model.js");
 
-router.post("/register", checkUsernameFree, validateRoleName, checkPasswordLength, (req, res, next) => {
-  // 1- pull username and password from the req.body
-  const {username, password} = req.body
-  // 2- pull role_name from req (can be found in 'validateRoleName' middleware)
-  const {role_name} = req
-  // 3- we need to make a hash
-  const hash = bcrypt.hashSync(password, BCRYPT_ROUNDS)
-  // 4- use the add model function to insert username, password, and role_name into the database
-  User.add({username, password: hash, role_name})
-  .then(user => {
-    res.status(201).json(user)
-  })
-  .catch(next)
-
-
+router.post(
+  "/register",
+  checkUsernameFree,
+  validateRoleName,
+  checkPasswordLength,
+  (req, res, next) => {
+    // 1- pull username and password from the req.body
+    const { username, password } = req.body;
+    // 2- pull role_name from req (can be found in 'validateRoleName' middleware)
+    const { role_name } = req;
+    // 3- we need to make a hash
+    const hash = bcrypt.hashSync(password, BCRYPT_ROUNDS);
+    // 4- use the add model function to insert username, password, and role_name into the database
+    User.add({ username, password: hash, role_name })
+      .then((user) => {
+        res.status(201).json(user);
+      })
+      .catch(next);
 
     /**
     [POST] /api/auth/register { "username": "anna", "password": "1234", "role_name": "angel" }
@@ -32,17 +40,32 @@ router.post("/register", checkUsernameFree, validateRoleName, checkPasswordLengt
       "role_name": "angel"
     }
    */
-
-});
-  
-
-
+  }
+);
 
 router.post("/login", checkUsernameExists, (req, res, next) => {
   // 1- Check credentials and then issue a token if the credentials are good
+  if (bcrypt.compareSync(req.body.password, req.user.password)) {
+    const token = buildToken(req.user);
+    res.json({
+      message: `${req.user.username} is back!`,
+      token,
+    });
+  } else {
+    next({ status: 401, message: "Invalid credentials" });
+  }
 
-  const { username, password } = req.body
-
+  function buildToken(user) {
+    const payload = {
+      subject: user.user_id,
+      role_name: user.role_name,
+      username: user.username,
+    };
+    const options = {
+      expiresIn: "1d",
+    };
+    return jwt.sign(payload, JWT_SECRET, options);
+  }
   /**
     [POST] /api/auth/login { "username": "sue", "password": "1234" }
 
