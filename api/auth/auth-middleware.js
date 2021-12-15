@@ -1,4 +1,5 @@
 const { JWT_SECRET } = require("../secrets"); // use this secret!
+const User = require("../users/users-model");
 
 const restricted = (req, res, next) => {
   /*
@@ -30,6 +31,7 @@ const only = (role_name) => (req, res, next) => {
 
     Pull the decoded token from the req object, to avoid verifying it again!
   */
+ next()
 };
 
 const checkUsernameExists = (req, res, next) => {
@@ -41,6 +43,35 @@ const checkUsernameExists = (req, res, next) => {
     }
   */
 };
+
+const checkUsernameFree = async (req, res, next) => {
+  /*
+    If the username in req.body does NOT exist in the database
+    status 401
+    {
+      "message": "Username taken."
+    }
+  */
+ try{
+  const user = await User.findBy({username: req.body.username})
+  if (user.length === 0){
+    next()
+  } else {
+    next({status: 401, message: "Username taken"})
+  }
+ } catch (err) {
+   next(err)
+ }
+ 
+};
+
+const checkPasswordLength = (req, res, next) => {
+  if(!req.body.password || req.body.password.length > 3) {
+    next()
+  } else {
+    next({ status: 422, message: "Password is too short!"})
+  }
+}
 
 const validateRoleName = (req, res, next) => {
   /*
@@ -69,6 +100,7 @@ const validateRoleName = (req, res, next) => {
   } else if (req.body.role_name.trim().length > 32) {
     next({ status: 422, message: "Role name can not be longer than 32 chars"})
   } else {
+    req.role_name = req.body.role_name.trim()
     next()
   }
 };
@@ -76,6 +108,8 @@ const validateRoleName = (req, res, next) => {
 module.exports = {
   restricted,
   checkUsernameExists,
+  checkUsernameFree,
+  checkPasswordLength,
   validateRoleName,
   only,
 };

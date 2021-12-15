@@ -1,20 +1,25 @@
 const router = require("express").Router();
 const bcrypt = require("bcryptjs")
-const { checkUsernameExists, validateRoleName } = require('./auth-middleware');
+const { checkUsernameExists, validateRoleName, checkUsernameFree, checkPasswordLength } = require('./auth-middleware');
 const { JWT_SECRET, BCRYPT_ROUNDS } = require("../secrets"); // use this secret!
+const jwt = require("jsonwebtoken")
 const User = require("../users/users-model.js");
 
-router.post("/register", validateRoleName, (req, res, next) => {
-  // const {username, password} = req.body // pulling username and password from req.body
-  // const {role_name} = req
+router.post("/register", checkUsernameFree, validateRoleName, checkPasswordLength, (req, res, next) => {
+  // 1- pull username and password from the req.body
+  const {username, password} = req.body
+  // 2- pull role_name from req (can be found in 'validateRoleName' middleware)
+  const {role_name} = req
+  // 3- we need to make a hash
+  const hash = bcrypt.hashSync(password, BCRYPT_ROUNDS)
+  // 4- use the add model function to insert username, password, and role_name into the database
+  User.add({username, password: hash, role_name})
+  .then(user => {
+    res.status(201).json(user)
+  })
+  .catch(next)
 
-  // const hash = bcrypt.hashSync(password, BCRYPT_ROUNDS) // password hashed
-  
-  // User.add({ username, password: hash, role_name }) // inserts user object inside the add function
-  //   .then(user => {
-  //     res.status(201).json(user)
-  //   })
-  //   .catch(next)
+
 
     /**
     [POST] /api/auth/register { "username": "anna", "password": "1234", "role_name": "angel" }
@@ -34,7 +39,9 @@ router.post("/register", validateRoleName, (req, res, next) => {
 
 
 router.post("/login", checkUsernameExists, (req, res, next) => {
+  // 1- Check credentials and then issue a token if the credentials are good
 
+  const { username, password } = req.body
 
   /**
     [POST] /api/auth/login { "username": "sue", "password": "1234" }
